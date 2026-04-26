@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: #15212d;
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef4f8 100%);
+}
+
+a {
+  @apply text-accent no-underline transition hover:underline;
+}
+
+.prose-paper {
+  @apply max-w-none text-[15px] leading-7 text-slate-800;
+}
+
+.prose-paper h1,
+.prose-paper h2,
+.prose-paper h3 {
+  @apply mt-8 font-serif text-ink;
+}
+
+.prose-paper h1 {
+  @apply text-3xl;
+}
+
+.prose-paper h2 {
+  @apply border-b border-line pb-2 text-2xl;
+}
+
+.prose-paper p,
+.prose-paper ul,
+.prose-paper ol,
+.prose-paper pre,
+.prose-paper blockquote {
+  @apply my-4;
+}
+
+.document-title {
+  @apply mb-6 text-4xl leading-tight;
+}
+
+.document-heading {
+  @apply mt-10 border-b border-line pb-3 text-2xl;
+}
+
+.document-subheading {
+  @apply mt-8 text-xl;
+}
+
+.document-copy {
+  @apply text-[15px] leading-8 text-slate-700;
+}
+
+.document-list {
+  @apply pl-6 text-[15px] leading-8 text-slate-700;
+}
+
+.document-quote {
+  @apply rounded-2xl border-l-4 border-accent bg-white px-5 py-4 text-slate-700 shadow-sm;
+}
+
+.document-divider {
+  @apply my-8 border-t border-line;
+}
+
+.report-section {
+  @apply mt-8;
+}
+
+.section-heading {
+  @apply mb-3 rounded-2xl border border-line bg-slate-50 px-4 py-3 text-xl font-semibold text-ink;
+}
+
+.section-copy {
+  @apply rounded-2xl border border-line bg-white px-5 py-4 shadow-sm;
+}
+
+.section-list {
+  @apply rounded-2xl border border-line bg-white px-8 py-4 shadow-sm;
+}
+
+.section-list li {
+  @apply my-2;
+}
+
+.concept-link {
+  @apply font-medium text-accent underline decoration-emerald-300 decoration-2 underline-offset-4;
+}
+
+.document-entity-link {
+  @apply rounded-md bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-800 no-underline ring-1 ring-emerald-200 transition hover:bg-emerald-100 hover:text-emerald-900;
+}
+
+.prose-paper code {
+  @apply rounded bg-slate-100 px-1 py-0.5 text-sm;
+}
+
+.prose-paper pre {
+  @apply overflow-x-auto rounded-xl border border-line bg-slate-950 p-4 text-slate-100;
+}
+
+.prose-paper table {
+  @apply my-4 w-full border-collapse text-sm;
+}
+
+.prose-paper img {
+  @apply max-w-full;
+}
+
+.prose-paper th,
+.prose-paper td {
+  @apply border border-line px-3 py-2;
+}
+
+.katex-display {
+  @apply overflow-x-auto py-2;
+}

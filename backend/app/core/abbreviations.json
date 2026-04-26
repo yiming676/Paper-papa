@@ -1,0 +1,8 @@
+{
+  "batch normalization": ["bn"],
+  "stochastic gradient descent": ["sgd"],
+  "large language model": ["llm"],
+  "reinforcement learning": ["rl"],
+  "natural language processing": ["nlp"],
+  "retrieval augmented generation": ["rag"]
+}
