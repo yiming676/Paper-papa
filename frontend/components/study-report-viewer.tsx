@@ -3,10 +3,10 @@
 import { ReactNode } from "react";
 
 import { LinkedText, TextLinkTarget } from "@/components/linked-text";
-import { MarkdownViewer } from "@/components/markdown-viewer";
+import { InlineMathMarkdown, MarkdownViewer } from "@/components/markdown-viewer";
 import {
-  DocumentConceptLink,
   FormulaBreakdown,
+  KeywordLink,
   PaperReference,
   PipelineModule,
   RelatedWorkComparison,
@@ -22,11 +22,11 @@ function headingId(value: string) {
     .replace(/-+/g, "-");
 }
 
-function linkTargets(conceptLinks: DocumentConceptLink[]): TextLinkTarget[] {
-  return conceptLinks.map((link) => ({
-    key: String(link.concept_id),
+function linkTargets(keywordLinks: KeywordLink[]): TextLinkTarget[] {
+  return keywordLinks.map((link) => ({
+    key: String(link.keyword_id),
     href: link.href,
-    terms: [link.raw_text, link.canonical_name, link.normalized_text, ...link.aliases]
+    terms: [link.raw_text, link.keyword, link.normalized_keyword, ...link.aliases]
   }));
 }
 
@@ -147,6 +147,62 @@ function SimpleTable({
   );
 }
 
+function symbolMath(value?: string | null) {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) {
+    return "$\\text{N/A}$";
+  }
+  if (
+    trimmed.startsWith("$") ||
+    trimmed.startsWith("\\(") ||
+    trimmed.startsWith("\\[") ||
+    trimmed.startsWith("$$")
+  ) {
+    return trimmed;
+  }
+  return `$${trimmed}$`;
+}
+
+function SymbolTable({
+  formula,
+  targets,
+  usedTargets,
+  isZh
+}: {
+  formula: FormulaBreakdown;
+  targets: TextLinkTarget[];
+  usedTargets: Set<string>;
+  isZh: boolean;
+}) {
+  if (!formula.symbols.length) {
+    return null;
+  }
+  return (
+    <div className="my-5 overflow-x-auto rounded-lg border border-line bg-white">
+      <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="w-48 border border-line px-3 py-2 text-left align-top">{isZh ? "符号" : "Symbol"}</th>
+            <th className="border border-line px-3 py-2 text-left align-top">{isZh ? "含义" : "Meaning"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {formula.symbols.map((symbol, index) => (
+            <tr key={`${symbol.symbol}-${index}`}>
+              <td className="whitespace-pre-wrap break-words border border-line px-3 py-2 align-top leading-6">
+                <InlineMathMarkdown content={symbolMath(symbol.symbol)} />
+              </td>
+              <td className="whitespace-pre-wrap break-words border border-line px-3 py-2 align-top leading-6">
+                <LinkedText text={symbol.meaning} targets={targets} usedTargets={usedTargets} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function FormulaCard({
   formula,
   targets,
@@ -167,14 +223,7 @@ function FormulaCard({
         <MarkdownViewer content={`$$\n${formula.latex || "\\text{N/A}"}\n$$`} variant="document" />
       </div>
       <KeyValue label={isZh ? "这个公式在算什么" : "What it computes"} value={formula.computes} targets={targets} usedTargets={usedTargets} />
-      {formula.symbols.length ? (
-        <SimpleTable
-          headers={isZh ? ["符号", "含义"] : ["Symbol", "Meaning"]}
-          rows={formula.symbols.map((symbol) => [symbol.symbol, symbol.meaning])}
-          targets={targets}
-          usedTargets={usedTargets}
-        />
-      ) : null}
+      <SymbolTable formula={formula} targets={targets} usedTargets={usedTargets} isZh={isZh} />
       <KeyValue label={isZh ? "输入变量" : "Input variables"} value={formula.input_variables.join(", ")} targets={targets} usedTargets={usedTargets} />
       <KeyValue label={isZh ? "输出结果" : "Output"} value={formula.output_result} targets={targets} usedTargets={usedTargets} />
       <KeyValue label={isZh ? "服务模块" : "Served module"} value={formula.served_module} targets={targets} usedTargets={usedTargets} />
@@ -236,13 +285,13 @@ function ReferenceGroup({
 
 export function StudyReportViewer({
   report,
-  conceptLinks
+  keywordLinks
 }: {
   report: StudyReport;
-  conceptLinks: DocumentConceptLink[];
+  keywordLinks: KeywordLink[];
 }) {
   const isZh = /[\u4e00-\u9fff]/.test(report.core_insight);
-  const targets = linkTargets(conceptLinks);
+  const targets = linkTargets(keywordLinks);
   const usedTargets = new Set<string>();
   const referencesBySection = groupReferences(report.paper_references ?? []);
   const warnings = report.warnings ?? [];

@@ -4,6 +4,7 @@ import {
   ConceptState,
   DocumentDetail,
   DocumentSummary,
+  KeywordDetail,
   MasteredConceptListResponse
 } from "@/types";
 
@@ -55,6 +56,18 @@ export async function getDocument(documentId: number): Promise<DocumentDetail> {
 export async function getConcept(conceptId: number, documentId?: number): Promise<ConceptDetail> {
   const query = documentId ? `?document_id=${documentId}` : "";
   return request<ConceptDetail>(`/concepts/${conceptId}${query}`);
+}
+
+export async function getKeyword(keywordId: number, documentId?: number): Promise<KeywordDetail> {
+  const query = documentId ? `?document_id=${documentId}` : "";
+  return request<KeywordDetail>(`/keywords/${keywordId}${query}`);
+}
+
+export async function retryKeyword(keywordId: number, documentId?: number): Promise<KeywordDetail> {
+  const query = documentId ? `?document_id=${documentId}` : "";
+  return request<KeywordDetail>(`/keywords/${keywordId}/retry${query}`, {
+    method: "POST"
+  });
 }
 
 export async function expandConcept(conceptId: number, documentId?: number): Promise<ConceptExpandResponse> {

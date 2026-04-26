@@ -73,11 +73,11 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
   }
 
   const isZh = document.preferred_language === "zh";
-  const contentWithContext = (document.annotated_markdown ?? "").replace(
-    /\/concepts\/(\d+)(?!\?documentId=)/g,
-    `/concepts/$1?documentId=${document.id}`
-  );
-  const conceptLinks = document.concept_links ?? [];
+  const contentWithContext = (document.annotated_markdown ?? "")
+    .replace(/\/concepts\/(\d+)(?!\?documentId=)/g, `/concepts/$1?documentId=${document.id}`)
+    .replace(/\/keywords\/(\d+)(?!\?documentId=)/g, `/keywords/$1?documentId=${document.id}`);
+  const keywordLinks = document.keyword_links ?? [];
+  const maxKeywordDepth = document.max_keyword_depth ?? 10;
   const sectionTitles = document.study_report
     ? reportSectionTitles(isZh)
     : Array.from((document.markdown_content ?? "").matchAll(/^##\s+(.+)$/gm), (match) => match[1].trim());
@@ -111,11 +111,11 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
                 <p className="text-xs text-muted">{isZh ? "概念链接" : "Concept links"}</p>
-                <p className="mt-1 font-medium text-ink">{conceptLinks.length}</p>
+                <p className="mt-1 font-medium text-ink">{keywordLinks.length}</p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
                 <p className="text-xs text-muted">{isZh ? "递归上限" : "Depth limit"}</p>
-                <p className="mt-1 font-medium text-ink">10</p>
+                <p className="mt-1 font-medium text-ink">{maxKeywordDepth}</p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3">
                 <p className="text-xs text-muted">{isZh ? "文档 ID" : "Document ID"}</p>
@@ -180,12 +180,12 @@ export default function DocumentPage({ params }: { params: { id: string } }) {
         </div>
       }
     >
-      {document.study_report ? (
-        <StudyReportViewer report={document.study_report} conceptLinks={conceptLinks} />
-      ) : document.annotated_markdown ? (
+      {document.annotated_markdown ? (
         <div className="rounded-[28px] border border-line bg-white px-8 py-8 shadow-sm md:px-12">
           <MarkdownViewer content={contentWithContext} variant="document" />
         </div>
+      ) : document.study_report ? (
+        <StudyReportViewer report={document.study_report} keywordLinks={keywordLinks} />
       ) : (
         <div className="rounded-xl border border-line bg-panel p-6 text-sm text-muted">
           {isZh ? "当前还没有可展示的文档内容。" : "No document content available yet."}

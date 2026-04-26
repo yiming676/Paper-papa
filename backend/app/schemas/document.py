@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.llm import LearningKeyword, PaperAsset, StudyReport
+from app.schemas.keyword import KeywordLink
 
 
 class DocumentBase(BaseModel):
@@ -39,3 +40,5 @@ class DocumentDetail(DocumentBase):
     asset_manifest: list[PaperAsset] = []
     learning_keywords: list[LearningKeyword] = []
     concept_links: list[DocumentConceptLink] = []
+    keyword_links: list[KeywordLink] = []
+    max_keyword_depth: int = 10

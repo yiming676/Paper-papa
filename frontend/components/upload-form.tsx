@@ -26,7 +26,7 @@ function buildStages(language: PreferredLanguage): UploadStage[] {
     {
       id: "parse",
       label: isZh ? "生成结构化学习报告" : "Generate structured study report",
-      description: isZh ? "解析论文、表格、图片并生成学习关键词" : "Parse the paper, tables, figures, and learning keywords",
+      description: isZh ? "30 页内优先发送完整抽取文本，会消耗较多 token" : "Papers up to 30 pages send full extracted text first, using more tokens",
       status: "pending"
     },
     {
@@ -169,6 +169,11 @@ export function UploadForm() {
           <option value="zh">中文</option>
           <option value="en">English</option>
         </select>
+        <p className="mt-3 text-xs leading-5 text-muted">
+          {isZh
+            ? "提示：30 页内论文会优先把完整 PDF 抽取文本发送给模型，以减少“只读摘要”的问题；这会明显增加 API token 消耗。"
+            : "Note: papers up to 30 pages send the full extracted PDF text to reduce summary-only reports; this can significantly increase API token usage."}
+        </p>
       </div>
 
       <button

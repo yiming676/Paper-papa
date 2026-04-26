@@ -28,6 +28,58 @@ function toHeadingId(children: ReactNode): string {
     .replace(/-+/g, "-");
 }
 
+function wrapInlineLatexSegment(segment: string): string {
+  const math: string[] = [];
+  const stash = (value: string) => {
+    const index = math.push(value) - 1;
+    return `@@LATEX_${index}@@`;
+  };
+
+  let output = segment
+    .replace(/\\\|[^，。；;:：\n]+?\\\|(?:[_^]\{?[A-Za-z0-9]+\}?)?/g, stash)
+    .replace(/\\[A-Za-z]+(?:\{[^{}]+\})?(?:[_^]\{?[A-Za-z0-9]+\}?)*(?:\([A-Za-z0-9_{}\\, ]+\))?/g, stash)
+    .replace(/\b[A-Za-z](?:[_^]\{?[A-Za-z0-9]+\}?)+(?:\([A-Za-z0-9_{}\\, ]+\))?/g, stash);
+
+  output = output.replace(/@@LATEX_(\d+)@@/g, (_, index) => `$${math[Number(index)]}$`);
+  return output;
+}
+
+function normalizeInlineLatex(content: string): string {
+  let inCodeFence = false;
+  let inDisplayMath = false;
+  const protectedPattern = /(`[^`]*`|\[[^\]]+\]\([^)]+\)|\$[^$\n]+\$)/g;
+
+  return content
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("```")) {
+        inCodeFence = !inCodeFence;
+        return line;
+      }
+      if (trimmed.startsWith("$$")) {
+        inDisplayMath = !inDisplayMath;
+        return line;
+      }
+      if (inCodeFence || inDisplayMath) {
+        return line;
+      }
+
+      return line
+        .split(protectedPattern)
+        .map((part) => {
+          if (!part || protectedPattern.test(part)) {
+            protectedPattern.lastIndex = 0;
+            return part;
+          }
+          protectedPattern.lastIndex = 0;
+          return wrapInlineLatexSegment(part);
+        })
+        .join("");
+    })
+    .join("\n");
+}
+
 export function MarkdownViewer({
   content,
   variant = "document"
@@ -36,6 +88,7 @@ export function MarkdownViewer({
   variant?: "document" | "concept";
 }) {
   const isConcept = variant === "concept";
+  const normalizedContent = normalizeInlineLatex(content);
 
   return (
     <div className="prose-paper">
@@ -125,8 +178,26 @@ export function MarkdownViewer({
           }
         }}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
+  );
+}
+
+export function InlineMathMarkdown({ content }: { content: string }) {
+  return (
+    <span className="inline-block align-middle">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+        components={{
+          p({ children }) {
+            return <>{children}</>;
+          }
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </span>
   );
 }

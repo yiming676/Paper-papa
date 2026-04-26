@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
-from app.schemas.llm import ConceptPageSections, EntityCandidate, LearningKeyword, PaperAsset, PaperReference, StudyReport
+from app.schemas.llm import ConceptPageSections, EntityCandidate, KeywordPageSections, LearningKeyword, PaperAsset, PaperReference, StudyReport
 from app.services.heuristics import (
     build_study_markdown_fallback,
     build_study_report_fallback,
@@ -202,6 +202,57 @@ class LLMService:
                 "所有解释性文字都必须使用严谨简体中文。英文论文也必须翻译、概括并用中文讲解，禁止整段复制英文原文。"
             )
         return "Output language: English."
+
+    def _page_count_from_text(self, raw_text: str) -> int | None:
+        pages = [int(item) for item in re.findall(r"(?m)^\[Page\s+(\d+)\]\s*$", raw_text)]
+        if pages:
+            return max(pages)
+        return None
+
+    def _paper_text_for_prompt(self, raw_text: str, output_language: str) -> tuple[str, str, list[str]]:
+        settings = self.settings
+        page_count = self._page_count_from_text(raw_text)
+        max_chars = max(settings.llm_max_input_chars, 18000)
+        selected_text = raw_text[:max_chars]
+        was_truncated = len(raw_text) > len(selected_text)
+        warnings: list[str] = []
+
+        if page_count is not None and page_count <= settings.llm_full_text_page_limit and not was_truncated:
+            strategy = (
+                f"PDF 共 {page_count} 页，未超过 {settings.llm_full_text_page_limit} 页；本次向模型发送完整 PDF 抽取文本。"
+                if output_language == "zh"
+                else f"The PDF has {page_count} pages, within the {settings.llm_full_text_page_limit}-page limit; the full extracted PDF text is sent to the model."
+            )
+            warnings.append(
+                f"Token 消耗提示：本次向模型发送完整 PDF 抽取文本，约 {len(selected_text)} 字符，会消耗较多 token。"
+                if output_language == "zh"
+                else f"Token usage notice: the full extracted PDF text was sent to the model, about {len(selected_text)} characters."
+            )
+        elif was_truncated:
+            strategy = (
+                f"PDF 抽取文本约 {len(raw_text)} 字符，超过 LLM_MAX_INPUT_CHARS={max_chars}，本次只发送前 {len(selected_text)} 字符。"
+                if output_language == "zh"
+                else f"The extracted PDF text has about {len(raw_text)} characters and exceeds LLM_MAX_INPUT_CHARS={max_chars}; only the first {len(selected_text)} characters are sent."
+            )
+            warnings.append(
+                f"配置限制：论文文本超过当前 LLM_MAX_INPUT_CHARS={max_chars}，报告可能没有覆盖全文；如模型上下文足够，可调高该值，但会显著增加 token 消耗。"
+                if output_language == "zh"
+                else f"Configuration limit: the paper text exceeds LLM_MAX_INPUT_CHARS={max_chars}; raise it if your model context is large enough, but token usage will increase significantly."
+            )
+        else:
+            strategy = (
+                f"PDF 页数无法从文本标记确认；本次发送全部可用抽取文本，约 {len(selected_text)} 字符。"
+                if output_language == "zh"
+                else f"The PDF page count could not be confirmed from text markers; all available extracted text is sent, about {len(selected_text)} characters."
+            )
+            if len(selected_text) > 30000:
+                warnings.append(
+                    f"Token 消耗提示：本次向模型发送约 {len(selected_text)} 字符论文文本，会消耗较多 token。"
+                    if output_language == "zh"
+                    else f"Token usage notice: about {len(selected_text)} characters of paper text were sent to the model."
+                )
+
+        return selected_text, strategy, warnings
 
     def _iter_terms(self, report: StudyReport):
         groups = [
@@ -413,13 +464,16 @@ class LLMService:
         prompt = self._load_prompt("document_structure.md")
         research_context = research_service.build_context(title=title, raw_text=raw_text)
         reference_context = [reference.model_dump() for reference in (paper_references or [])[:12]]
+        paper_text, read_strategy, input_warnings = self._paper_text_for_prompt(raw_text, output_language=output_language)
         user_prompt = (
             f"论文标题：{title}\n"
             f"{self._language_instruction(output_language)}\n"
+            f"PDF 阅读策略：{read_strategy}\n"
+            "如果 PDF 阅读策略说明已发送完整抽取文本，禁止在 warnings 中声称“只读摘要”或“未完整阅读全文”。\n"
             f"外部论文检索上下文：\n{research_context}\n\n"
             f"PDF 图表引用线索 JSON（只能用于文字引用，用户会回原文查看，不要输出图片 URL 或表格数据）：\n"
             f"{json.dumps(reference_context, ensure_ascii=False)[:9000]}\n\n"
-            f"论文原文抽取文本：\n{raw_text[:18000]}"
+            f"论文原文抽取文本：\n{paper_text}"
         )
         data = self._call_json(prompt, user_prompt)
         candidate = data.get("study_report") if isinstance(data, dict) and isinstance(data.get("study_report"), dict) else data
@@ -434,6 +488,7 @@ class LLMService:
                         if output_language == "zh"
                         else "Model limitation: the output language did not fully match the user request."
                     )
+                report.warnings.extend(input_warnings)
                 report.warnings.extend(self._validate_report_quality(report, output_language=output_language))
                 report.warnings = list(dict.fromkeys(item for item in report.warnings if item))
                 return report
@@ -453,6 +508,7 @@ class LLMService:
                 if output_language == "zh"
                 else f"API response issue: {self.last_error}"
             )
+        fallback.warnings.extend(input_warnings)
         fallback = self._normalize_report(fallback, title=title, output_language=output_language)
         fallback = self._normalize_report_evidence(fallback, paper_references=paper_references, assets=assets)
         fallback.warnings.extend(self._validate_report_quality(fallback, output_language=output_language))
@@ -528,6 +584,59 @@ class LLMService:
             prerequisites=prereqs,
             example=f"If the paper discusses {concept_name} in an equation or method step, read the concept page together with that local passage.",
         )
+
+    def generate_keyword_page(
+        self,
+        keyword: str,
+        keyword_type: str,
+        source_sentence: str,
+        source_context: str,
+        paper_title: str,
+        learning_path: str,
+        level: int,
+        max_depth: int,
+        output_language: str = "en",
+    ) -> KeywordPageSections:
+        prompt = self._load_prompt("keyword_page.md")
+        user_prompt = (
+            f"论文标题：{paper_title}\n"
+            f"当前关键词：{keyword}\n"
+            f"关键词类型：{keyword_type}\n"
+            f"当前学习层级：第 {level}/{max_depth} 层\n"
+            f"学习路径：{learning_path}\n"
+            f"{self._language_instruction(output_language)}\n"
+            "请生成结合当前论文语境的关键词学习笔记，并返回可继续递归学习的新关键词。\n\n"
+            f"关键词所在原句：\n{source_sentence[:1200]}\n\n"
+            f"原论文/学习笔记相关上下文：\n{source_context[:6000]}"
+        )
+        user_prompt = (
+            f"Paper title: {paper_title}\n"
+            f"Current keyword: {keyword}\n"
+            f"Keyword type: {keyword_type}\n"
+            f"Current learning level: {level}/{max_depth}\n"
+            f"Learning path: {learning_path}\n"
+            f"{self._language_instruction(output_language)}\n"
+            "Generate a paper-specific keyword learning note. Do not give a generic encyclopedia entry. "
+            "Also return new keywords that can support recursive learning.\n\n"
+            f"Source sentence containing the keyword:\n{source_sentence[:1200]}\n\n"
+            f"Relevant paper / study-note context:\n{source_context[:6000]}"
+        )
+        data = self._call_json(prompt, user_prompt)
+        if not data:
+            raise LLMGenerationError(self.last_error or "LLM did not return keyword page JSON.")
+        try:
+            parsed = KeywordPageSections.model_validate(data)
+        except Exception as exc:
+            raise LLMGenerationError("LLM keyword page JSON did not match the expected schema.") from exc
+
+        current = keyword.strip().lower()
+        normalized_current = re.sub(r"\s+", " ", current)
+        parsed.learning_keywords = [
+            item
+            for item in parsed.learning_keywords
+            if item.text.strip() and re.sub(r"\s+", " ", item.text.strip().lower()) != normalized_current
+        ][:8]
+        return parsed
 
     def extract_recursive_prerequisites(self, markdown_content: str, output_language: str = "en") -> list[str]:
         prompt = self._load_prompt("concept_expand.md")

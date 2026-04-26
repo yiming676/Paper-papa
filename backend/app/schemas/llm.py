@@ -364,6 +364,16 @@ class ConceptPageSections(BaseModel):
     example: str
 
 
+class KeywordPageSections(BaseModel):
+    meaning: str
+    paper_specific_meaning: str
+    why_needed: str
+    relationships: str
+    common_misunderstandings: list[str] = Field(default_factory=list)
+    intuitive_example: str
+    learning_keywords: list[LearningKeyword] = Field(default_factory=list)
+
+
 class ConceptPageContent(ConceptPageSections):
     title: str
     concept_type: str

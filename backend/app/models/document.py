@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.config import get_settings
 from app.db.base import Base
 
 
@@ -28,6 +29,10 @@ class Document(Base):
     )
 
     entities: Mapped[list["DocumentEntity"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+    keyword_nodes: Mapped[list["KeywordNode"]] = relationship(
         back_populates="document",
         cascade="all, delete-orphan",
     )
@@ -77,6 +82,30 @@ class Document(Base):
                 }
             )
         return links
+
+    @property
+    def keyword_links(self) -> list[dict]:
+        links: list[dict] = []
+        for keyword in sorted(
+            [item for item in self.keyword_nodes if item.level == 1],
+            key=lambda item: (item.keyword.lower(), item.id),
+        ):
+            links.append(
+                {
+                    "keyword_id": keyword.id,
+                    "href": f"/keywords/{keyword.id}?documentId={self.id}",
+                    "raw_text": keyword.keyword,
+                    "keyword": keyword.keyword,
+                    "normalized_keyword": keyword.normalized_keyword,
+                    "keyword_type": keyword.keyword_type,
+                    "aliases": keyword.aliases,
+                }
+            )
+        return links
+
+    @property
+    def max_keyword_depth(self) -> int:
+        return get_settings().max_keyword_depth
 
 
 class DocumentEntity(Base):

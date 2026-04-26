@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     model_name: str = Field(default="gpt-4.1-mini", alias="MODEL_NAME")
     llm_timeout_seconds: float = Field(default=120.0, alias="LLM_TIMEOUT_SECONDS")
     llm_max_tokens: int = Field(default=24000, alias="LLM_MAX_TOKENS")
+    llm_max_input_chars: int = Field(default=160000, alias="LLM_MAX_INPUT_CHARS")
+    llm_full_text_page_limit: int = Field(default=30, alias="LLM_FULL_TEXT_PAGE_LIMIT")
     llm_json_mode: bool = Field(default=True, alias="LLM_JSON_MODE")
     allow_llm_fallback: bool = Field(default=False, alias="ALLOW_LLM_FALLBACK")
     enable_research_search: bool = Field(default=False, alias="ENABLE_RESEARCH_SEARCH")
@@ -32,6 +34,7 @@ class Settings(BaseSettings):
     storage_dir: str = "storage/uploads"
     assets_dir: str = "storage/assets"
     max_expand_depth: int = Field(default=10, alias="MAX_EXPAND_DEPTH")
+    max_keyword_depth: int = Field(default=10, alias="MAX_KEYWORD_DEPTH")
     max_prerequisites_per_concept: int = Field(default=5, alias="MAX_PREREQUISITES_PER_CONCEPT")
     max_annotation_entities: int = Field(default=30, alias="MAX_ANNOTATION_ENTITIES")
     semantic_scholar_api_key: str | None = Field(default=None, alias="SEMANTIC_SCHOLAR_API_KEY")

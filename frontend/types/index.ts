@@ -1,5 +1,6 @@
 export type DocumentStatus = "uploaded" | "parsed" | "annotated";
 export type ConceptState = "unknown" | "learning" | "mastered";
+export type KeywordGenerationStatus = "stub" | "generating" | "generated" | "error";
 
 export interface LearningKeyword {
   text: string;
@@ -249,6 +250,8 @@ export interface DocumentDetail extends DocumentSummary {
   asset_manifest?: PaperAsset[];
   learning_keywords?: LearningKeyword[];
   concept_links?: DocumentConceptLink[];
+  keyword_links?: KeywordLink[];
+  max_keyword_depth?: number;
 }
 
 export interface DocumentConceptLink {
@@ -259,6 +262,60 @@ export interface DocumentConceptLink {
   normalized_text: string;
   entity_type: string;
   aliases: string[];
+}
+
+export interface KeywordLink {
+  keyword_id: number;
+  href: string;
+  raw_text: string;
+  keyword: string;
+  normalized_keyword: string;
+  keyword_type: string;
+  aliases: string[];
+}
+
+export interface KeywordPathItem {
+  id: number;
+  keyword: string;
+  keyword_type: string;
+  level: number;
+}
+
+export interface KeywordExplanationContent {
+  keyword: string;
+  keyword_type: string;
+  meaning: string;
+  paper_specific_meaning: string;
+  why_needed: string;
+  relationships: string;
+  common_misunderstandings: string[];
+  intuitive_example: string;
+  learning_keywords: LearningKeyword[];
+  level: number;
+  max_depth: number;
+  depth_limit_reached: boolean;
+}
+
+export interface KeywordDetail {
+  id: number;
+  paper_id: number;
+  keyword: string;
+  normalized_keyword: string;
+  keyword_type: string;
+  source_sentence?: string | null;
+  source_context?: string | null;
+  parent_keyword_id?: number | null;
+  level: number;
+  max_depth: number;
+  depth_limit_reached: boolean;
+  generation_status: KeywordGenerationStatus;
+  error_message?: string | null;
+  explanation_content?: KeywordExplanationContent | null;
+  annotated_markdown?: string | null;
+  keyword_links: KeywordLink[];
+  learning_path: KeywordPathItem[];
+  created_at: string;
+  updated_at?: string | null;
 }
 
 export interface ConceptRelationItem {

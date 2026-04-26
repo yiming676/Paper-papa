@@ -13,6 +13,7 @@ from app.models.concept import Concept, ConceptPage, UserConceptState
 from app.models.document import Document, DocumentEntity
 from app.schemas.llm import EntityCandidate, LearningKeyword
 from app.services.document_service import get_document_or_404
+from app.services.keyword_service import annotate_document_keywords
 from app.services.llm_service import llm_service
 
 
@@ -137,73 +138,5 @@ def annotate_first_occurrences(markdown_content: str, matches: list[EntityMatch]
 
 
 def annotate_document(db: Session, document_id: int) -> Document:
-    settings = get_settings()
     document = get_document_or_404(db=db, document_id=document_id)
-    if not document.markdown_content:
-        raise HTTPException(status_code=400, detail="Document must be parsed before annotation.")
-
-    if document.learning_keywords:
-        candidates = []
-        for item in document.learning_keywords:
-            try:
-                keyword = LearningKeyword.model_validate(item)
-            except Exception:
-                continue
-            candidates.append(
-                EntityCandidate(
-                    text=keyword.text,
-                    type=keyword.type if keyword.type in {"term", "parameter", "formula"} else "term",
-                    normalized=keyword.normalized or normalize_text(keyword.text),
-                    reason=keyword.reason,
-                    aliases=keyword.aliases,
-                )
-            )
-    else:
-        candidates = llm_service.extract_entities(document.markdown_content)
-    candidates = candidates[: settings.max_annotation_entities]
-    db.execute(delete(DocumentEntity).where(DocumentEntity.document_id == document.id))
-    db.commit()
-
-    matches: list[EntityMatch] = []
-    occupied: list[tuple[int, int]] = []
-    protected = _protected_ranges(document.markdown_content)
-
-    for candidate in candidates:
-        occurrence = locate_first_occurrence(document.markdown_content, candidate, protected=protected)
-        if not occurrence:
-            continue
-        start, end, raw_text = occurrence
-        if any(not (end <= existing_start or start >= existing_end) for existing_start, existing_end in occupied):
-            continue
-
-        concept = resolve_or_create_concept(db=db, candidate=candidate, document=document)
-        entity = DocumentEntity(
-            document_id=document.id,
-            concept_id=concept.id,
-            raw_text=raw_text,
-            normalized_text=normalize_text(candidate.normalized),
-            entity_type=candidate.type,
-            first_occurrence_only=True,
-            position_start=start,
-            position_end=end,
-        )
-        db.add(entity)
-        db.flush()
-        matches.append(
-            EntityMatch(
-                concept=concept,
-                entity=candidate,
-                document_id=document.id,
-                raw_text=raw_text,
-                start=start,
-                end=end,
-            )
-        )
-        occupied.append((start, end))
-
-    document.annotated_markdown = annotate_first_occurrences(document.markdown_content, matches)
-    document.status = "annotated"
-    db.add(document)
-    db.commit()
-    db.refresh(document)
-    return document
+    return annotate_document_keywords(db=db, document=document)

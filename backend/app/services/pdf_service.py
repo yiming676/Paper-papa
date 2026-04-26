@@ -74,7 +74,7 @@ def extract_paper_content(
 
     for page_index, page in enumerate(pdf, start=1):
         page_text = page.get_text("text")
-        pages.append(page_text)
+        pages.append(f"\n\n[Page {page_index}]\n{page_text}")
         if len(references) >= max_references:
             continue
         for reference in _extract_reference_candidates(page_text, page=page_index):
