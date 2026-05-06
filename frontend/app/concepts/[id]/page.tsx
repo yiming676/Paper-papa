@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ConceptPageViewer } from "@/components/concept-page-viewer";
@@ -15,7 +15,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { getConcept } from "@/lib/api";
 import { ConceptDetail, ConceptState } from "@/types";
 
-export default function ConceptPage({ params }: { params: { id: string } }) {
+export default function ConceptPage() {
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [state, setState] = useState<ConceptState>("unknown");
@@ -23,9 +24,23 @@ export default function ConceptPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const documentIdParam = searchParams.get("documentId");
   const documentId = documentIdParam ? Number(documentIdParam) : undefined;
+  const isInvalidDocumentId = documentIdParam ? !Number.isFinite(documentId) : false;
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const conceptId = Number(rawId);
+  const isInvalidConceptId = !Number.isFinite(conceptId);
 
   async function loadConcept() {
-    const data = await getConcept(Number(params.id), documentId);
+    if (isInvalidConceptId) {
+      setError("Invalid concept id.");
+      return;
+    }
+
+    if (isInvalidDocumentId) {
+      setError("Invalid document id.");
+      return;
+    }
+
+    const data = await getConcept(conceptId, documentId);
     setConcept(data);
     setState(data.state);
     setMarkdown(data.concept_page_markdown);
@@ -33,8 +48,20 @@ export default function ConceptPage({ params }: { params: { id: string } }) {
   }
 
   useEffect(() => {
+    if (isInvalidConceptId) {
+      setConcept(null);
+      setError("Invalid concept id.");
+      return;
+    }
+
+    if (isInvalidDocumentId) {
+      setConcept(null);
+      setError("Invalid document id.");
+      return;
+    }
+
     loadConcept().catch((err) => setError(err instanceof Error ? err.message : "Failed to load concept."));
-  }, [params.id, documentId]);
+  }, [conceptId, documentId, isInvalidConceptId, isInvalidDocumentId]);
 
   if (error) {
     return <ErrorState message={error} />;
