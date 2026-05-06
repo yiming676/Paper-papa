@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { ErrorState } from "@/components/error-state";
@@ -12,28 +12,64 @@ import { PageShell } from "@/components/page-shell";
 import { getKeyword, retryKeyword } from "@/lib/api";
 import { KeywordDetail } from "@/types";
 
-export default function KeywordPage({ params }: { params: { id: string } }) {
+export default function KeywordPage() {
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [keyword, setKeyword] = useState<KeywordDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retrying, startRetry] = useTransition();
   const documentIdParam = searchParams.get("documentId");
   const documentId = documentIdParam ? Number(documentIdParam) : undefined;
-  const keywordId = Number(params.id);
+  const isInvalidDocumentId = documentIdParam ? !Number.isFinite(documentId) : false;
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const keywordId = Number(rawId);
+  const isInvalidKeywordId = !Number.isFinite(keywordId);
 
   async function loadKeyword() {
+    if (isInvalidKeywordId) {
+      setError("Invalid keyword id.");
+      return;
+    }
+
+    if (isInvalidDocumentId) {
+      setError("Invalid document id.");
+      return;
+    }
+
     const data = await getKeyword(keywordId, documentId);
     setKeyword(data);
     setError(null);
   }
 
   useEffect(() => {
+    if (isInvalidKeywordId) {
+      setKeyword(null);
+      setError("Invalid keyword id.");
+      return;
+    }
+
+    if (isInvalidDocumentId) {
+      setKeyword(null);
+      setError("Invalid document id.");
+      return;
+    }
+
     setKeyword(null);
     setError(null);
     loadKeyword().catch((err) => setError(err instanceof Error ? err.message : "Failed to load keyword."));
-  }, [keywordId, documentId]);
+  }, [keywordId, documentId, isInvalidKeywordId, isInvalidDocumentId]);
 
   function retryGeneration() {
+    if (isInvalidKeywordId) {
+      setError("Invalid keyword id.");
+      return;
+    }
+
+    if (isInvalidDocumentId) {
+      setError("Invalid document id.");
+      return;
+    }
+
     setError(null);
     startRetry(async () => {
       try {
