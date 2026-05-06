@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { ErrorState } from "@/components/error-state";
@@ -45,24 +46,36 @@ function reportSectionTitles(isZh: boolean) {
       ];
 }
 
-export default function DocumentPage({ params }: { params: { id: string } }) {
+export default function DocumentPage() {
+  const params = useParams<{ id: string }>();
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const documentId = Number(params.id);
+  const isInvalidDocumentId = !Number.isFinite(documentId);
 
   async function loadDocument() {
+    if (isInvalidDocumentId) {
+      setError("Invalid document id.");
+      return;
+    }
+
     const data = await getDocument(documentId);
     setDocument(data);
     setError(null);
   }
 
   useEffect(() => {
+    if (isInvalidDocumentId) {
+      setError("Invalid document id.");
+      return;
+    }
+  
     loadDocument().catch((err) => {
       setError(err instanceof Error ? err.message : "Failed to load document.");
     });
-  }, [documentId]);
+  }, [documentId, isInvalidDocumentId]);
 
   if (error) {
     return <ErrorState message={error} />;
