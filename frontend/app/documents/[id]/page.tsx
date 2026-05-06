@@ -52,7 +52,8 @@ export default function DocumentPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const documentId = Number(params.id);
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const documentId = Number(rawId);
   const isInvalidDocumentId = !Number.isFinite(documentId);
 
   async function loadDocument() {
@@ -68,10 +69,11 @@ export default function DocumentPage() {
 
   useEffect(() => {
     if (isInvalidDocumentId) {
+      setDocument(null);
       setError("Invalid document id.");
       return;
     }
-  
+
     loadDocument().catch((err) => {
       setError(err instanceof Error ? err.message : "Failed to load document.");
     });
