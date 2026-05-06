@@ -18,25 +18,23 @@ import { ConceptDetail, ConceptState } from "@/types";
 export default function ConceptPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+
   const [concept, setConcept] = useState<ConceptDetail | null>(null);
   const [state, setState] = useState<ConceptState>("unknown");
   const [markdown, setMarkdown] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const documentIdParam = searchParams.get("documentId");
-  const documentId = documentIdParam ? Number(documentIdParam) : undefined;
-  const isInvalidDocumentId = documentIdParam ? !Number.isFinite(documentId) : false;
-  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const conceptId = Number(rawId);
+
+  const rawConceptId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const conceptId = Number(rawConceptId);
   const isInvalidConceptId = !Number.isFinite(conceptId);
+
+  const documentIdParam = searchParams.get("documentId");
+  const parsedDocumentId = documentIdParam ? Number(documentIdParam) : undefined;
+  const documentId = Number.isFinite(parsedDocumentId) ? parsedDocumentId : undefined;
 
   async function loadConcept() {
     if (isInvalidConceptId) {
       setError("Invalid concept id.");
-      return;
-    }
-
-    if (isInvalidDocumentId) {
-      setError("Invalid document id.");
       return;
     }
 
@@ -54,14 +52,13 @@ export default function ConceptPage() {
       return;
     }
 
-    if (isInvalidDocumentId) {
-      setConcept(null);
-      setError("Invalid document id.");
-      return;
-    }
+    setConcept(null);
+    setError(null);
 
-    loadConcept().catch((err) => setError(err instanceof Error ? err.message : "Failed to load concept."));
-  }, [conceptId, documentId, isInvalidConceptId, isInvalidDocumentId]);
+    loadConcept().catch((err) => {
+      setError(err instanceof Error ? err.message : "Failed to load concept.");
+    });
+  }, [conceptId, documentId, isInvalidConceptId]);
 
   if (error) {
     return <ErrorState message={error} />;
@@ -74,8 +71,10 @@ export default function ConceptPage() {
   const isZh = concept.output_language === "zh";
   const depth = concept.concept_page?.depth ?? 1;
   const maxDepth = concept.concept_page?.max_depth ?? 10;
-  const contentWithContext = documentId
-    ? markdown.replace(/\/concepts\/(\d+)(?!\?documentId=)/g, `/concepts/$1?documentId=${documentId}`)
+  const effectiveDocumentId = documentId ?? concept.related_document_ids[0];
+
+  const contentWithContext = effectiveDocumentId
+    ? markdown.replace(/\/concepts\/(\d+)(?!\?documentId=)/g, `/concepts/$1?documentId=${effectiveDocumentId}`)
     : markdown;
 
   return (
@@ -100,11 +99,17 @@ export default function ConceptPage() {
           </div>
 
           <div className="rounded-2xl border border-line bg-white/90 p-5 text-sm text-muted shadow-sm">
-            <p>{isZh ? `关联文档：${concept.related_document_ids.length || 0}` : `Related documents: ${concept.related_document_ids.length || 0}`}</p>
+            <p>
+              {isZh
+                ? `关联文档：${concept.related_document_ids.length || 0}`
+                : `Related documents: ${concept.related_document_ids.length || 0}`}
+            </p>
             <p className="mt-2">{isZh ? "输出语言：中文" : "Language: English"}</p>
             <p className="mt-2">{isZh ? `当前深度：第 ${depth}/${maxDepth} 层` : `Depth: ${depth}/${maxDepth}`}</p>
             {concept.depth_limit_reached ? (
-              <p className="mt-2 text-amber-700">{isZh ? "该分支已到递归上限。" : "This branch has reached the recursion limit."}</p>
+              <p className="mt-2 text-amber-700">
+                {isZh ? "该分支已到递归上限。" : "This branch has reached the recursion limit."}
+              </p>
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {concept.related_document_ids.map((relatedDocumentId) => (
@@ -120,10 +125,12 @@ export default function ConceptPage() {
           </div>
 
           <div className="rounded-2xl border border-line bg-white/90 p-5 shadow-sm">
-            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-muted">{isZh ? "递归概念" : "Recursive concepts"}</p>
+            <p className="mb-3 text-xs uppercase tracking-[0.12em] text-muted">
+              {isZh ? "递归概念" : "Recursive concepts"}
+            </p>
             <ExpandButton
               conceptId={concept.id}
-              documentId={documentId}
+              documentId={effectiveDocumentId}
               language={concept.output_language}
               onExpanded={() => {
                 loadConcept().catch((err) => setError(err instanceof Error ? err.message : "Failed to refresh concept."));
@@ -134,7 +141,7 @@ export default function ConceptPage() {
       }
     >
       {concept.concept_page ? (
-        <ConceptPageViewer concept={concept} documentId={documentId} />
+        <ConceptPageViewer concept={concept} documentId={effectiveDocumentId} />
       ) : (
         <MarkdownViewer content={contentWithContext} variant="concept" />
       )}
