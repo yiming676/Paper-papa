@@ -15,24 +15,22 @@ import { KeywordDetail } from "@/types";
 export default function KeywordPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+
   const [keyword, setKeyword] = useState<KeywordDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retrying, startRetry] = useTransition();
-  const documentIdParam = searchParams.get("documentId");
-  const documentId = documentIdParam ? Number(documentIdParam) : undefined;
-  const isInvalidDocumentId = documentIdParam ? !Number.isFinite(documentId) : false;
-  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const keywordId = Number(rawId);
+
+  const rawKeywordId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const keywordId = Number(rawKeywordId);
   const isInvalidKeywordId = !Number.isFinite(keywordId);
+
+  const documentIdParam = searchParams.get("documentId");
+  const parsedDocumentId = documentIdParam ? Number(documentIdParam) : undefined;
+  const documentId = Number.isFinite(parsedDocumentId) ? parsedDocumentId : undefined;
 
   async function loadKeyword() {
     if (isInvalidKeywordId) {
       setError("Invalid keyword id.");
-      return;
-    }
-
-    if (isInvalidDocumentId) {
-      setError("Invalid document id.");
       return;
     }
 
@@ -48,16 +46,13 @@ export default function KeywordPage() {
       return;
     }
 
-    if (isInvalidDocumentId) {
-      setKeyword(null);
-      setError("Invalid document id.");
-      return;
-    }
-
     setKeyword(null);
     setError(null);
-    loadKeyword().catch((err) => setError(err instanceof Error ? err.message : "Failed to load keyword."));
-  }, [keywordId, documentId, isInvalidKeywordId, isInvalidDocumentId]);
+
+    loadKeyword().catch((err) => {
+      setError(err instanceof Error ? err.message : "Failed to load keyword.");
+    });
+  }, [keywordId, documentId, isInvalidKeywordId]);
 
   function retryGeneration() {
     if (isInvalidKeywordId) {
@@ -65,12 +60,8 @@ export default function KeywordPage() {
       return;
     }
 
-    if (isInvalidDocumentId) {
-      setError("Invalid document id.");
-      return;
-    }
-
     setError(null);
+
     startRetry(async () => {
       try {
         const data = await retryKeyword(keywordId, documentId);
@@ -89,10 +80,13 @@ export default function KeywordPage() {
     return <LoadingState label="Generating keyword note..." />;
   }
 
-  const documentHref = documentId ? `/documents/${documentId}` : `/documents/${keyword.paper_id}`;
-  const contentWithContext = documentId
-    ? (keyword.annotated_markdown ?? "").replace(/\/keywords\/(\d+)(?!\?documentId=)/g, `/keywords/$1?documentId=${documentId}`)
-    : keyword.annotated_markdown ?? "";
+  const effectiveDocumentId = documentId ?? keyword.paper_id;
+  const documentHref = `/documents/${effectiveDocumentId}`;
+
+  const contentWithContext = (keyword.annotated_markdown ?? "").replace(
+    /\/keywords\/(\d+)(?!\?documentId=)/g,
+    `/keywords/$1?documentId=${effectiveDocumentId}`
+  );
 
   return (
     <PageShell
@@ -105,7 +99,9 @@ export default function KeywordPage() {
             <Link href={documentHref} className="mt-3 inline-block text-sm">
               Back to paper note
             </Link>
-            <p className="mt-3 text-sm text-muted">Level {keyword.level}/{keyword.max_depth}</p>
+            <p className="mt-3 text-sm text-muted">
+              Level {keyword.level}/{keyword.max_depth}
+            </p>
             <p className="mt-2 text-sm text-muted">Keyword type: {keyword.keyword_type}</p>
             {keyword.depth_limit_reached ? (
               <p className="mt-2 text-sm text-amber-700">This branch has reached the recursion limit.</p>
@@ -145,7 +141,9 @@ export default function KeywordPage() {
       {keyword.generation_status === "error" ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-900">
           <p className="font-medium">Keyword generation failed.</p>
-          <p className="mt-2 whitespace-pre-wrap">{keyword.error_message || "The model/API did not return a usable keyword note."}</p>
+          <p className="mt-2 whitespace-pre-wrap">
+            {keyword.error_message || "The model/API did not return a usable keyword note."}
+          </p>
           <button
             type="button"
             disabled={retrying}
@@ -156,7 +154,7 @@ export default function KeywordPage() {
           </button>
         </div>
       ) : keyword.explanation_content ? (
-        <KeywordPageViewer keyword={keyword} documentId={documentId} />
+        <KeywordPageViewer keyword={keyword} documentId={effectiveDocumentId} />
       ) : (
         <MarkdownViewer content={contentWithContext || "No keyword note available yet."} variant="concept" />
       )}
